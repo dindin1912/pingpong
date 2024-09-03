@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Ping Pong</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #fff;
+            color: #000;
+        }
+        #gameContainer, #startScreen {
+            text-align: center;
+        }
+        canvas {
+            border: 2px solid #000;
+        }
+        button, select {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #000;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+        }
+        #startScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #000;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        <br>
+        <button id="resetBtn">Reset</button>
+        <select id="difficulty">
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+        </select>
+        <select id="ballType">
+            <option value="circle">Circle</option>
+            <option value="football">Football</option>
+            <option value="coconut">Coconut</option>
+        </select>
+    </div>
+    <div id="startScreen">
+        <h1>Modern Ping Pong</h1>
+        <button id="startBtn">Start Game</button>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('startScreen');
+
+        const paddleWidth = 10;
+        const paddleHeight = 100;
+        const ballSize = 20;
+
+        let playerY = (canvas.height - paddleHeight) / 2;
+        let aiY = (canvas.height - paddleHeight) / 2;
+        let ballX = canvas.width / 2;
+        let ballY = canvas.height / 2;
+        let ballSpeedX = 5;
+        let ballSpeedY = 5;
+
+        let playerScore = 0;
+        let aiScore = 0;
+
+        let gameRunning = false;
+        let difficulty = 0.05;
+        let ballImage = new Image();
+        let currentBallType = 'circle';
+
+        const ballTypes = {
+            circle: null,
+            football: 'https://i.imgur.com/6zTzTFP.png',
+            coconut: 'https://i.imgur.com/iiLhXKC.png'
+        };
+
+        function loadBallImage(type) {
+            if (type === 'circle') {
+                ballImage = null;
+            } else {
+                ballImage.src = ballTypes[type];
+            }
+            currentBallType = type;
+        }
+
+        function drawRect(x, y, width, height, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, width, height);
+        }
+
+        function drawBall(x, y) {
+            if (currentBallType === 'circle') {
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(x, y, ballSize / 2, 0, Math.PI * 2, false);
+                ctx.fill();
+            } else {
+                ctx.drawImage(ballImage, x - ballSize / 2, y - ballSize / 2, ballSize, ballSize);
+            }
+        }
+
+        function drawText(text, x, y, color, size) {
+            ctx.fillStyle = color;
+            ctx.font = `${size}px Arial`;
+            ctx.fillText(text, x, y);
+        }
+
+        function update(deltaTime) {
+            if (!gameRunning) return;
+
+            const timeScale = deltaTime / (1000 / 120); // Scale movement for 120 FPS
+
+            ballX += ballSpeedX * timeScale;
+            ballY += ballSpeedY * timeScale;
+
+            // AI movement
+            const aiCenter = aiY + paddleHeight / 2;
+            if (aiCenter < ballY - 35) {
+                aiY += difficulty * canvas.height * timeScale;
+            } else if (aiCenter > ballY + 35) {
+                aiY -= difficulty * canvas.height * timeScale;
+            }
+
+            // Ball collision with top and bottom
+            if (ballY < ballSize / 2 || ballY > canvas.height - ballSize / 2) {
+                ballSpeedY = -ballSpeedY;
+            }
+
+            // Ball collision with paddles
+            if (
+                (ballX < paddleWidth + ballSize / 2 && ballY > playerY && ballY < playerY + paddleHeight) ||
+                (ballX > canvas.width - paddleWidth - ballSize / 2 && ballY > aiY && ballY < aiY + paddleHeight)
+            ) {
+                ballSpeedX = -ballSpeedX;
+                ballSpeedY += (Math.random() - 0.5) * 3; // Simplified physics
+            }
+
+            // Score
+            if (ballX < 0) {
+                aiScore++;
+                resetBall();
+            } else if (ballX > canvas.width) {
+                playerScore++;
+                resetBall();
+            }
+        }
+
+        function resetBall() {
+            ballX = canvas.width / 2;
+            ballY = canvas.height / 2;
+            ballSpeedX = -ballSpeedX;
+            ballSpeedY = (Math.random() - 0.5) * 6;
+        }
+
+        function draw() {
+            // Clear canvas
+            drawRect(0, 0, canvas.width, canvas.height, '#fff');
+
+            // Draw paddles
+            drawRect(0, playerY, paddleWidth, paddleHeight, '#000');
+            drawRect(canvas.width - paddleWidth, aiY, paddleWidth, paddleHeight, '#000');
+
+            // Draw ball
+            drawBall(ballX, ballY);
+
+            // Draw scores
+            drawText(playerScore, 100, 50, '#000', 32);
+            drawText(aiScore, canvas.width - 100, 50, '#000', 32);
+
+            // Draw net
+            for (let i = 0; i < canvas.height; i += 40) {
+                drawRect(canvas.width / 2 - 1, i, 2, 20, '#000');
+            }
+        }
+
+        let lastTime = 0;
+        function gameLoop(currentTime) {
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+
+            update(deltaTime);
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            playerY = e.clientY - rect.top - paddleHeight / 2;
+        });
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            gameRunning = true;
+            startScreen.style.display = 'none';
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            gameRunning = false;
+            playerScore = 0;
+            aiScore = 0;
+            playerY = (canvas.height - paddleHeight) / 2;
+            aiY = (canvas.height - paddleHeight) / 2;
+            resetBall();
+            startScreen.style.display = 'block';
+        });
+
+        document.getElementById('difficulty').addEventListener('change', (e) => {
+            switch (e.target.value) {
+                case 'easy':
+                    difficulty = 0.05;
+                    break;
+                case 'medium':
+                    difficulty = 0.07;
+                    break;
+                case 'hard':
+                    difficulty = 0.09;
+                    break;
+            }
+        });
+
+        document.getElementById('ballType').addEventListener('change', (e) => {
+            loadBallImage(e.target.value);
+        });
+
+        loadBallImage('circle');
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
